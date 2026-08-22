@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#090810">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Boards">
+  <title>Boards</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="shell" class="shell" hidden>
+    <header class="topbar">
+      <a class="brand" href="#" data-route="boards"><span class="brand-mark app-icon" aria-hidden="true"></span><span>Boards</span></a>
+      <button id="share-space" class="icon-button header-share" type="button" aria-label="Share private space" title="Share" data-icon="share"></button>
+    </header>
+    <main id="main" tabindex="-1"><div id="app" class="page"></div></main>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </div>
+  <div id="loading" class="loading"><span class="brand-mark app-icon" aria-hidden="true"></span><p>Opening your workspace…</p></div>
+
+  <dialog id="board-dialog" class="dialog">
+    <form id="board-form" method="dialog">
+      <div class="dialog-head"><div><p id="board-dialog-eyebrow" class="eyebrow">Workspace</p><h2 id="board-dialog-title">New board</h2></div><button class="icon-button" type="button" data-close-dialog aria-label="Close" data-icon="x"></button></div>
+      <label>Board name<input name="name" maxlength="120" required placeholder="e.g. Website launch"></label>
+      <label>Description<textarea name="description" rows="3"></textarea></label>
+      <div class="dialog-actions"><button type="button" data-close-dialog class="button ghost">Cancel</button><button id="save-board" type="submit" class="button primary">Create board</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="list-dialog" class="dialog">
+    <form id="list-form" method="dialog">
+      <div class="dialog-head"><h2 id="list-dialog-title">New list</h2><button class="icon-button" type="button" data-close-dialog aria-label="Close" data-icon="x"></button></div>
+      <input type="hidden" name="listId">
+      <label>List name<input name="name" maxlength="120" required placeholder="e.g. In progress"></label>
+      <div class="dialog-actions split"><button id="delete-list" type="button" class="button danger" hidden><span data-icon="trash"></span> Delete</button><span></span><button type="button" data-close-dialog class="button ghost">Cancel</button><button id="save-list" type="submit" class="button primary">Add list</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="delete-confirm-dialog" class="dialog">
+    <div class="dialog-body">
+      <div class="dialog-head"><h2 id="delete-confirm-title">Delete item?</h2><button class="icon-button" type="button" data-close-dialog aria-label="Close" data-icon="x"></button></div>
+      <p id="delete-confirm-message" class="dialog-message"></p>
+      <div class="dialog-actions"><button type="button" data-close-dialog class="button ghost">Cancel</button><button id="delete-confirm-button" type="button" class="button danger"><span data-icon="trash"></span> <span id="delete-confirm-label">Delete permanently</span></button></div>
+    </div>
+  </dialog>
+
+  <dialog id="card-dialog" class="dialog dialog-card">
+    <form id="card-form" method="dialog">
+      <div class="dialog-head"><div><p class="eyebrow" id="card-context">Card</p><h2 id="card-dialog-title">New card</h2></div><button class="icon-button" type="button" data-close-dialog aria-label="Close" data-icon="x"></button></div>
+      <input type="hidden" name="cardId">
+      <label>Title<input name="title" maxlength="120" required></label>
+      <label id="card-list-field">List<select name="listId" required></select></label>
+      <div class="tag-field"><label for="card-tag-input">Tags</label><div id="card-tag-control" class="tag-control"><div id="selected-tags" class="selected-tags"></div><input id="card-tag-input" type="text" maxlength="40" autocomplete="off" placeholder="Add a tag…" aria-autocomplete="list" aria-controls="tag-suggestions" aria-expanded="false"></div><div id="tag-suggestions" class="tag-suggestions" role="listbox" hidden></div><div id="tag-editor" class="tag-editor" hidden><label>Tag<input id="tag-editor-name" maxlength="40"></label><label id="tag-editor-date-row" hidden>Date<input id="tag-editor-date" type="date"></label><div><span class="tag-editor-label">Color</span><div id="tag-color-palette" class="tag-color-palette"></div></div><fieldset id="tag-color-scope" class="tag-color-scope" hidden><legend>Apply color to</legend><label><input type="radio" name="tagColorScope" value="value" checked><span id="tag-color-scope-value">This key and value</span></label><label><input type="radio" name="tagColorScope" value="key"><span id="tag-color-scope-key">All values with this key</span></label></fieldset><div class="tag-editor-actions"><button id="cancel-tag-edit" type="button" class="button ghost small">Cancel</button><button id="save-tag-edit" type="button" class="button secondary small">Save tag</button></div></div></div>
+      <div class="markdown-field">
+        <div class="markdown-heading"><label for="card-description">Description</label><div class="markdown-mode-toggle" role="group" aria-label="Description view"><button type="button" data-markdown-mode="markdown">Markdown</button><button type="button" data-markdown-mode="preview">Preview</button><button type="button" data-markdown-mode="split">Side-by-side</button></div></div>
+        <div class="markdown-workspace" data-mode="split"><textarea id="card-description" name="description" rows="12" placeholder="Write Markdown…"></textarea><section id="card-description-preview" class="markdown-preview" aria-label="Description preview" aria-live="polite"></section></div>
+      </div>
+      <div class="dialog-actions split"><button id="delete-card" type="button" class="button danger" hidden><span data-icon="trash"></span> Delete</button><span></span><button type="button" data-close-dialog class="button ghost">Cancel</button><button type="submit" class="button primary">Save card</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="view-dialog" class="dialog">
+    <form id="view-form" method="dialog">
+      <div class="dialog-head"><h2>Save this view</h2><button class="icon-button" type="button" data-close-dialog aria-label="Close" data-icon="x"></button></div>
+      <label>View name<input name="name" maxlength="120" required></label>
+      <label class="check"><input name="isDefault" type="checkbox"> Make this the default table view</label>
+      <div class="dialog-actions"><button type="button" data-close-dialog class="button ghost">Cancel</button><button type="submit" class="button primary">Save view</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="share-dialog" class="dialog share-dialog">
+    <div class="dialog-body">
+      <div class="dialog-head"><h2>Share this space</h2><button class="icon-button" type="button" data-close-dialog aria-label="Close" data-icon="x"></button></div>
+      <p class="share-intro">Scan this QR code on another device to open the same private space.</p>
+      <div class="share-layout">
+        <div id="share-qr" class="share-qr" aria-live="polite"></div>
+        <div class="share-details">
+          <label for="share-url">Private URL</label>
+          <div class="share-url-row"><input id="share-url" type="text" readonly spellcheck="false"><button id="copy-share-url" class="button secondary" type="button"><span data-icon="copy"></span> Copy link</button></div>
+          <p><strong>Keep this link private.</strong> Anyone with it receives full access to this space.</p>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <script type="module" src="/app.bundle.js?v=5bdf8b067424"></script>
+</body>
+</html>

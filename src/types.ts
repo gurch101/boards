@@ -1,0 +1,10 @@
+export type Bindings = { DB: D1Database; ASSETS: Fetcher; D1_ADMIN_DEV?: string; CF_ACCESS_TEAM_DOMAIN?: string; CF_ACCESS_AUD?: string };
+export type Space = { id: number; access_key_hash: string; name: string; created_at: number };
+export type BoardRow = { id: number; space_id: number; name: string; description: string; revision: number; sort_order: number; archived_at: number | null; created_at: number; updated_at: number };
+export type ListRow = { id: number; board_id: number; name: string; sort_order: number; archived_at: number | null };
+export type Tag = { id: number; name: string; color: string };
+export type CardModel = { id: number; board_id: number; list_id: number; title: string; description: string; sort_order: number; archived_at: number | null; created_at: number; updated_at: number; tags: Tag[] };
+export type ViewConfig = { search?: string; columns?: string[]; filters?: Array<{ field: string; operator: string; value?: unknown }>; groupBy?: string | null; sorts?: Array<{ field: string; direction: "asc" | "desc" }> };
+export type BoardLoadMode = "complete" | "paginated";
+export type ListCardCount = { listId: number; count: number };
+export type CursorPage<T> = { cards: T[]; total: number; nextCursor: string | null };

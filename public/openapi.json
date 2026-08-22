@@ -1,0 +1,254 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Boards API",
+    "version": "1.0.0",
+    "description": "HTTP API for private spaces, boards, lists, cards, tags, and saved views. Create a space to receive a capability path, then use the final path segment as the Bearer token. All board mutations require the board's current revision in `If-Match`; successful mutations return the next revision. Timestamps are Unix milliseconds."
+  },
+  "servers": [{ "url": "/", "description": "This Boards deployment" }],
+  "tags": [
+    { "name": "Spaces" },
+    { "name": "Boards" },
+    { "name": "Lists" },
+    { "name": "Cards" },
+    { "name": "Views" }
+  ],
+  "security": [{ "capability": [] }],
+  "paths": {
+    "/api/spaces": {
+      "post": {
+        "tags": ["Spaces"],
+        "summary": "Create a private space",
+        "description": "Returns a private capability path. Store it securely; the capability cannot be recovered.",
+        "operationId": "createSpace",
+        "security": [],
+        "responses": {
+          "201": { "description": "Space created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateSpaceResponse" }, "example": { "data": { "path": "/p/abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG" } } } } },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/bootstrap": {
+      "get": {
+        "tags": ["Spaces"],
+        "summary": "Load space and board summaries",
+        "operationId": "getBootstrap",
+        "responses": {
+          "200": { "description": "Space bootstrap", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BootstrapResponse" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/boards": {
+      "post": {
+        "tags": ["Boards"],
+        "summary": "Create a board",
+        "description": "Creates a board with To do, Doing, and Done lists.",
+        "operationId": "createBoard",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BoardWrite" }, "example": { "name": "Website launch", "description": "Launch work" } } } },
+        "responses": {
+          "201": { "$ref": "#/components/responses/CreatedMutation" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationFailed" }
+        }
+      }
+    },
+    "/api/boards/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/BoardId" }],
+      "get": {
+        "tags": ["Boards"],
+        "summary": "Get a board snapshot",
+        "description": "Returns cards inline for boards with at most 1,000 active cards. Larger boards use `loadMode: paginated` and must be loaded through query endpoints.",
+        "operationId": "getBoard",
+        "responses": {
+          "200": { "description": "Board snapshot", "headers": { "ETag": { "description": "Quoted board revision", "schema": { "type": "string" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BoardSnapshotResponse" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "tags": ["Boards"],
+        "summary": "Update a board",
+        "operationId": "updateBoard",
+        "parameters": [{ "$ref": "#/components/parameters/IfMatch" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BoardWrite" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Mutation" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" }, "412": { "$ref": "#/components/responses/StaleRevision" }, "422": { "$ref": "#/components/responses/ValidationFailed" } }
+      },
+      "delete": {
+        "tags": ["Boards"],
+        "summary": "Delete a board permanently",
+        "operationId": "deleteBoard",
+        "parameters": [{ "$ref": "#/components/parameters/IfMatch" }],
+        "responses": { "204": { "description": "Board deleted" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" }, "412": { "$ref": "#/components/responses/StaleRevision" } }
+      }
+    },
+    "/api/boards/{id}/move": {
+      "post": {
+        "tags": ["Boards"], "summary": "Reorder a board", "operationId": "moveBoard",
+        "parameters": [{ "$ref": "#/components/parameters/BoardId" }, { "$ref": "#/components/parameters/IfMatch" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MoveBefore" }, "example": { "beforeId": 42 } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Mutation" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" }, "412": { "$ref": "#/components/responses/StaleRevision" } }
+      }
+    },
+    "/api/boards/{id}/query": {
+      "post": {
+        "tags": ["Cards"], "summary": "Query cards on a board", "operationId": "queryBoardCards",
+        "parameters": [{ "$ref": "#/components/parameters/BoardId" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BoardQuery" }, "example": { "config": { "search": "launch", "filters": [{ "field": "tags", "operator": "any", "value": ["Urgent"] }], "groupBy": "list", "sorts": [{ "field": "updated_at", "direction": "desc" }] }, "limit": 100 } } } },
+        "responses": { "200": { "description": "Query results", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BoardQueryResponse" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "$ref": "#/components/responses/CursorExpired" }, "422": { "$ref": "#/components/responses/ValidationFailed" } }
+      }
+    },
+    "/api/boards/{boardId}/lists/{listId}/cards/query": {
+      "post": {
+        "tags": ["Cards"], "summary": "Page cards in a list", "operationId": "queryListCards",
+        "parameters": [{ "$ref": "#/components/parameters/BoardIdNamed" }, { "$ref": "#/components/parameters/ListId" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ListQuery" }, "example": { "search": "launch", "limit": 50 } } } },
+        "responses": { "200": { "description": "List page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ListQueryResponse" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "$ref": "#/components/responses/CursorExpired" }, "422": { "$ref": "#/components/responses/ValidationFailed" } }
+      }
+    },
+    "/api/boards/{boardId}/lists/counts": {
+      "post": {
+        "tags": ["Lists"], "summary": "Count matching cards by list", "operationId": "getListCounts",
+        "parameters": [{ "$ref": "#/components/parameters/BoardIdNamed" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "properties": { "search": { "type": "string" } } }, "example": { "search": "urgent" } } } },
+        "responses": { "200": { "description": "Per-list counts", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ListCountsResponse" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" }, "422": { "$ref": "#/components/responses/ValidationFailed" } }
+      }
+    },
+    "/api/boards/{id}/lists": {
+      "post": {
+        "tags": ["Lists"], "summary": "Create a list", "operationId": "createList",
+        "parameters": [{ "$ref": "#/components/parameters/BoardId" }, { "$ref": "#/components/parameters/IfMatch" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NameWrite" }, "example": { "name": "Review" } } } },
+        "responses": { "201": { "$ref": "#/components/responses/CreatedMutation" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" }, "412": { "$ref": "#/components/responses/StaleRevision" }, "422": { "$ref": "#/components/responses/ValidationFailed" } }
+      }
+    },
+    "/api/boards/{boardId}/lists/{listId}": {
+      "parameters": [{ "$ref": "#/components/parameters/BoardIdNamed" }, { "$ref": "#/components/parameters/ListId" }],
+      "patch": {
+        "tags": ["Lists"], "summary": "Rename a list", "operationId": "updateList", "parameters": [{ "$ref": "#/components/parameters/IfMatch" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NameWrite" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Mutation" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" }, "412": { "$ref": "#/components/responses/StaleRevision" }, "422": { "$ref": "#/components/responses/ValidationFailed" } }
+      },
+      "delete": {
+        "tags": ["Lists"], "summary": "Delete a list and its cards permanently", "operationId": "deleteList", "parameters": [{ "$ref": "#/components/parameters/IfMatch" }],
+        "responses": { "200": { "$ref": "#/components/responses/DeletedMutation" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" }, "412": { "$ref": "#/components/responses/StaleRevision" } }
+      }
+    },
+    "/api/boards/{boardId}/lists/{listId}/move": {
+      "post": {
+        "tags": ["Lists"], "summary": "Reorder a list", "operationId": "moveList",
+        "parameters": [{ "$ref": "#/components/parameters/BoardIdNamed" }, { "$ref": "#/components/parameters/ListId" }, { "$ref": "#/components/parameters/IfMatch" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MoveBefore" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Mutation" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" }, "412": { "$ref": "#/components/responses/StaleRevision" } }
+      }
+    },
+    "/api/boards/{id}/cards": {
+      "post": {
+        "tags": ["Cards"], "summary": "Create a card", "operationId": "createCard",
+        "parameters": [{ "$ref": "#/components/parameters/BoardId" }, { "$ref": "#/components/parameters/IfMatch" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CardCreate" }, "example": { "listId": 10, "title": "Ship API docs", "description": "Publish the OpenAPI reference", "tags": [{ "name": "Priority:High", "color": "pink", "colorScope": "key" }] } } } },
+        "responses": { "201": { "$ref": "#/components/responses/CreatedMutation" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" }, "412": { "$ref": "#/components/responses/StaleRevision" }, "422": { "$ref": "#/components/responses/ValidationFailed" } }
+      }
+    },
+    "/api/boards/{boardId}/cards/{cardId}": {
+      "parameters": [{ "$ref": "#/components/parameters/BoardIdNamed" }, { "$ref": "#/components/parameters/CardId" }],
+      "patch": {
+        "tags": ["Cards"], "summary": "Update a card", "operationId": "updateCard", "parameters": [{ "$ref": "#/components/parameters/IfMatch" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CardUpdate" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Mutation" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" }, "412": { "$ref": "#/components/responses/StaleRevision" }, "422": { "$ref": "#/components/responses/ValidationFailed" } }
+      },
+      "delete": {
+        "tags": ["Cards"], "summary": "Delete a card permanently", "operationId": "deleteCard", "parameters": [{ "$ref": "#/components/parameters/IfMatch" }],
+        "responses": { "200": { "$ref": "#/components/responses/DeletedMutation" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" }, "412": { "$ref": "#/components/responses/StaleRevision" } }
+      }
+    },
+    "/api/boards/{boardId}/cards/{cardId}/move": {
+      "post": {
+        "tags": ["Cards"], "summary": "Move a card", "description": "Moves the card to a list, before another card, or explicitly to the start/end.", "operationId": "moveCard",
+        "parameters": [{ "$ref": "#/components/parameters/BoardIdNamed" }, { "$ref": "#/components/parameters/CardId" }, { "$ref": "#/components/parameters/IfMatch" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CardMove" }, "example": { "listId": 11, "placement": "start" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Mutation" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" }, "412": { "$ref": "#/components/responses/StaleRevision" }, "422": { "$ref": "#/components/responses/ValidationFailed" } }
+      }
+    },
+    "/api/boards/{id}/views": {
+      "post": {
+        "tags": ["Views"], "summary": "Create a saved view", "operationId": "createView",
+        "parameters": [{ "$ref": "#/components/parameters/BoardId" }, { "$ref": "#/components/parameters/IfMatch" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ViewWrite" } } } },
+        "responses": { "201": { "$ref": "#/components/responses/CreatedMutation" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "$ref": "#/components/responses/Conflict" }, "412": { "$ref": "#/components/responses/StaleRevision" }, "422": { "$ref": "#/components/responses/ValidationFailed" } }
+      }
+    },
+    "/api/boards/{boardId}/views/{viewId}": {
+      "parameters": [{ "$ref": "#/components/parameters/BoardIdNamed" }, { "$ref": "#/components/parameters/ViewId" }],
+      "put": {
+        "tags": ["Views"], "summary": "Replace a saved view", "operationId": "replaceView", "parameters": [{ "$ref": "#/components/parameters/IfMatch" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ViewWrite" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Mutation" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "$ref": "#/components/responses/Conflict" }, "412": { "$ref": "#/components/responses/StaleRevision" }, "422": { "$ref": "#/components/responses/ValidationFailed" } }
+      },
+      "delete": {
+        "tags": ["Views"], "summary": "Delete a saved view", "operationId": "deleteView", "parameters": [{ "$ref": "#/components/parameters/IfMatch" }],
+        "responses": { "200": { "$ref": "#/components/responses/DeletedMutation" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" }, "412": { "$ref": "#/components/responses/StaleRevision" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "capability": { "type": "http", "scheme": "bearer", "bearerFormat": "43-character private-space capability", "description": "The capability is the final segment of the `/p/{capability}` path returned when the space is created." }
+    },
+    "parameters": {
+      "BoardId": { "name": "id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Id" } },
+      "BoardIdNamed": { "name": "boardId", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Id" } },
+      "ListId": { "name": "listId", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Id" } },
+      "CardId": { "name": "cardId", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Id" } },
+      "ViewId": { "name": "viewId", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Id" } },
+      "IfMatch": { "name": "If-Match", "in": "header", "required": true, "description": "Current board revision, optionally quoted (for example `\"3\"`).", "schema": { "type": "string", "pattern": "^\\\"?[0-9]+\\\"?$" }, "example": "0" }
+    },
+    "responses": {
+      "Mutation": { "description": "Mutation succeeded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MutationResponse" } } } },
+      "CreatedMutation": { "description": "Resource created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MutationResponse" } } } },
+      "DeletedMutation": { "description": "Resource deleted", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeleteResponse" } } } },
+      "Unauthorized": { "description": "Missing or invalid capability", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" }, "example": { "error": { "code": "unauthorized", "message": "A valid private-space capability is required" } } } } },
+      "NotFound": { "description": "Resource not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+      "Conflict": { "description": "A record with that name exists", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+      "CursorExpired": { "description": "Cursor no longer matches the board revision or query", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" }, "example": { "error": { "code": "cursor_expired", "message": "This result set changed; reload it from the beginning" } } } } },
+      "StaleRevision": { "description": "The board changed since the supplied revision", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" }, "example": { "error": { "code": "stale_revision", "message": "The board changed; reload and try again" } } } } },
+      "ValidationFailed": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" }, "example": { "error": { "code": "validation_failed", "message": "Board name is required" } } } } },
+      "InternalError": { "description": "Unexpected server error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+    },
+    "schemas": {
+      "Id": { "type": "integer", "format": "int64", "minimum": 1, "example": 42 },
+      "Timestamp": { "type": "integer", "format": "int64", "description": "Unix timestamp in milliseconds", "example": 1787270400000 },
+      "NullableTimestamp": { "allOf": [{ "$ref": "#/components/schemas/Timestamp" }], "nullable": true },
+      "CreateSpaceResponse": { "type": "object", "required": ["data"], "properties": { "data": { "type": "object", "required": ["path"], "properties": { "path": { "type": "string", "pattern": "^/p/[A-Za-z0-9_-]{43}$" } } } } },
+      "BootstrapResponse": { "type": "object", "required": ["data"], "properties": { "data": { "type": "object", "required": ["space", "boards"], "properties": { "space": { "$ref": "#/components/schemas/Space" }, "boards": { "type": "array", "items": { "$ref": "#/components/schemas/Board" } } } } } },
+      "Space": { "type": "object", "required": ["id", "name"], "properties": { "id": { "$ref": "#/components/schemas/Id" }, "name": { "type": "string" } } },
+      "BoardWrite": { "type": "object", "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 120 }, "description": { "type": "string" } } },
+      "NameWrite": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 120 } } },
+      "Board": { "type": "object", "required": ["id", "name", "description", "revision", "sort_order", "archived_at", "created_at", "updated_at"], "properties": { "id": { "$ref": "#/components/schemas/Id" }, "space_id": { "$ref": "#/components/schemas/Id" }, "name": { "type": "string" }, "description": { "type": "string" }, "revision": { "type": "integer", "minimum": 0 }, "sort_order": { "type": "number" }, "archived_at": { "$ref": "#/components/schemas/NullableTimestamp" }, "created_at": { "$ref": "#/components/schemas/Timestamp" }, "updated_at": { "$ref": "#/components/schemas/Timestamp" } } },
+      "BoardList": { "type": "object", "required": ["id", "board_id", "name", "sort_order", "archived_at"], "properties": { "id": { "$ref": "#/components/schemas/Id" }, "board_id": { "$ref": "#/components/schemas/Id" }, "name": { "type": "string" }, "sort_order": { "type": "number" }, "archived_at": { "$ref": "#/components/schemas/NullableTimestamp" } } },
+      "Tag": { "type": "object", "required": ["id", "name", "color"], "properties": { "id": { "$ref": "#/components/schemas/Id" }, "name": { "type": "string", "maxLength": 40 }, "color": { "type": "string", "enum": ["lime", "cyan", "pink", "purple", "yellow"] } } },
+      "TagInput": { "oneOf": [{ "type": "string", "minLength": 1, "maxLength": 40 }, { "type": "object", "required": ["name"], "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 40 }, "color": { "type": "string", "enum": ["lime", "cyan", "pink", "purple", "yellow"] }, "colorScope": { "type": "string", "enum": ["key", "value"], "default": "value" } } }] },
+      "Card": { "type": "object", "required": ["id", "board_id", "list_id", "title", "description", "sort_order", "archived_at", "created_at", "updated_at", "tags"], "properties": { "id": { "$ref": "#/components/schemas/Id" }, "board_id": { "$ref": "#/components/schemas/Id" }, "list_id": { "$ref": "#/components/schemas/Id" }, "title": { "type": "string" }, "description": { "type": "string" }, "sort_order": { "type": "number" }, "archived_at": { "$ref": "#/components/schemas/NullableTimestamp" }, "created_at": { "$ref": "#/components/schemas/Timestamp" }, "updated_at": { "$ref": "#/components/schemas/Timestamp" }, "tags": { "type": "array", "items": { "$ref": "#/components/schemas/Tag" } } } },
+      "CardCreate": { "type": "object", "required": ["listId", "title"], "properties": { "listId": { "$ref": "#/components/schemas/Id" }, "title": { "type": "string", "minLength": 1, "maxLength": 120 }, "description": { "type": "string" }, "tags": { "type": "array", "maxItems": 20, "items": { "$ref": "#/components/schemas/TagInput" } } } },
+      "CardUpdate": { "type": "object", "properties": { "title": { "type": "string", "minLength": 1, "maxLength": 120 }, "description": { "type": "string" }, "tags": { "type": "array", "maxItems": 20, "items": { "$ref": "#/components/schemas/TagInput" } } } },
+      "CardMove": { "type": "object", "required": ["listId"], "properties": { "listId": { "$ref": "#/components/schemas/Id" }, "beforeId": { "$ref": "#/components/schemas/Id" }, "placement": { "type": "string", "enum": ["start", "end"] } } },
+      "MoveBefore": { "type": "object", "properties": { "beforeId": { "$ref": "#/components/schemas/Id", "description": "Omit to move to the end." } } },
+      "Filter": { "type": "object", "required": ["field", "operator"], "properties": { "field": { "type": "string", "description": "title, description, list, tags, created_at, updated_at, or tag:<facet>" }, "operator": { "type": "string", "enum": ["empty", "not_empty", "contains", "equals", "not_equals", "gt", "gte", "lt", "lte", "any", "all", "none"] }, "value": {} } },
+      "Sort": { "type": "object", "required": ["field", "direction"], "properties": { "field": { "type": "string" }, "direction": { "type": "string", "enum": ["asc", "desc"] } } },
+      "ViewConfig": { "type": "object", "properties": { "search": { "type": "string" }, "columns": { "type": "array", "items": { "type": "string" } }, "filters": { "type": "array", "items": { "$ref": "#/components/schemas/Filter" } }, "groupBy": { "type": "string", "nullable": true }, "sorts": { "type": "array", "items": { "$ref": "#/components/schemas/Sort" } } } },
+      "BoardQuery": { "allOf": [{ "$ref": "#/components/schemas/ViewConfig" }, { "type": "object", "properties": { "config": { "$ref": "#/components/schemas/ViewConfig" }, "limit": { "type": "integer", "minimum": 1, "maximum": 200, "default": 100 }, "cursor": { "type": "string" } } }] },
+      "ListQuery": { "type": "object", "properties": { "search": { "type": "string" }, "limit": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 }, "cursor": { "type": "string" } } },
+      "Group": { "type": "object", "required": ["key", "label", "cardIds", "count"], "properties": { "key": { "type": "string" }, "label": { "type": "string" }, "cardIds": { "type": "array", "items": { "$ref": "#/components/schemas/Id" } }, "count": { "type": "integer", "minimum": 0 } } },
+      "SavedView": { "type": "object", "required": ["id", "board_id", "name", "is_default", "created_at", "updated_at", "config"], "properties": { "id": { "$ref": "#/components/schemas/Id" }, "board_id": { "$ref": "#/components/schemas/Id" }, "name": { "type": "string" }, "is_default": { "type": "integer", "enum": [0, 1] }, "created_at": { "$ref": "#/components/schemas/Timestamp" }, "updated_at": { "$ref": "#/components/schemas/Timestamp" }, "config": { "$ref": "#/components/schemas/ViewConfig" } } },
+      "ViewWrite": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 120 }, "config": { "$ref": "#/components/schemas/ViewConfig" }, "isDefault": { "type": "boolean", "default": false } } },
+      "ListCardCount": { "type": "object", "required": ["listId", "count"], "properties": { "listId": { "$ref": "#/components/schemas/Id" }, "count": { "type": "integer", "minimum": 0 } } },
+      "BoardSnapshotResponse": { "type": "object", "required": ["data", "revision"], "properties": { "data": { "type": "object", "required": ["board", "lists", "cards", "cardCount", "listCardCounts", "loadMode", "tags", "views"], "properties": { "board": { "$ref": "#/components/schemas/Board" }, "lists": { "type": "array", "items": { "$ref": "#/components/schemas/BoardList" } }, "cards": { "type": "array", "items": { "$ref": "#/components/schemas/Card" } }, "cardCount": { "type": "integer", "minimum": 0 }, "listCardCounts": { "type": "array", "items": { "$ref": "#/components/schemas/ListCardCount" } }, "loadMode": { "type": "string", "enum": ["complete", "paginated"] }, "tags": { "type": "array", "items": { "$ref": "#/components/schemas/Tag" } }, "views": { "type": "array", "items": { "$ref": "#/components/schemas/SavedView" } } } }, "revision": { "type": "integer", "minimum": 0 } } },
+      "BoardQueryResponse": { "type": "object", "required": ["data", "revision"], "properties": { "data": { "type": "object", "required": ["cards", "groups", "total", "nextCursor"], "properties": { "cards": { "type": "array", "items": { "$ref": "#/components/schemas/Card" } }, "groups": { "type": "array", "items": { "$ref": "#/components/schemas/Group" } }, "total": { "type": "integer", "minimum": 0 }, "nextCursor": { "type": "string", "nullable": true } } }, "revision": { "type": "integer", "minimum": 0 } } },
+      "ListQueryResponse": { "type": "object", "required": ["data", "revision"], "properties": { "data": { "type": "object", "required": ["cards", "total", "nextCardId", "nextCursor"], "properties": { "cards": { "type": "array", "items": { "$ref": "#/components/schemas/Card" } }, "total": { "type": "integer", "minimum": 0 }, "nextCardId": { "type": "integer", "format": "int64", "nullable": true }, "nextCursor": { "type": "string", "nullable": true } } }, "revision": { "type": "integer", "minimum": 0 } } },
+      "ListCountsResponse": { "type": "object", "required": ["data", "revision"], "properties": { "data": { "type": "object", "required": ["counts"], "properties": { "counts": { "type": "array", "items": { "$ref": "#/components/schemas/ListCardCount" } } } }, "revision": { "type": "integer", "minimum": 0 } } },
+      "MutationResponse": { "type": "object", "required": ["data", "revision"], "properties": { "data": { "type": "object", "required": ["id"], "properties": { "id": { "$ref": "#/components/schemas/Id" } } }, "revision": { "type": "integer", "minimum": 0 } } },
+      "DeleteResponse": { "type": "object", "required": ["data", "revision"], "properties": { "data": { "type": "object", "required": ["deleted"], "properties": { "deleted": { "type": "boolean", "enum": [true] } } }, "revision": { "type": "integer", "minimum": 0 } } },
+      "ErrorResponse": { "type": "object", "required": ["error"], "properties": { "error": { "type": "object", "required": ["code", "message"], "properties": { "code": { "type": "string" }, "message": { "type": "string" }, "fieldErrors": { "type": "object", "additionalProperties": { "type": "string" } } } } } }
+    }
+  }
+}

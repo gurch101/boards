@@ -1,0 +1,35 @@
+name = "boards-preview"
+main = "src/index.ts"
+compatibility_date = "2026-08-08"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/admin", "/admin/*", "/", "/p/*", "/docs", "/openapi.json", "/manifest.webmanifest"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "boards-preview"
+database_id = "REPLACE_WITH_PREVIEW_D1_ID"
+migrations_dir = "migrations"
+
+[observability]
+enabled = true
+
+[env.production]
+name = "boards"
+workers_dev = false
+
+[[env.production.routes]]
+  pattern = "boards.121gw.dev"
+  custom_domain = true
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "boards-production"
+database_id = "290a178d-8e2d-4fbc-ab13-b59b2d581ade"
+migrations_dir = "migrations"
+
+[env.production.observability]
+enabled = true
